@@ -10,6 +10,7 @@ class TaskSummary(BaseModel):
     completed: int
     pending: int
     by_priority: dict  # {"low": count, "medium": count, "high": count}
+    by_status: dict = {}  # {"todo": count, "in_progress": count, "done": count}
 
 
 class UserPerformance(BaseModel):

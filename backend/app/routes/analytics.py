@@ -4,11 +4,13 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.orm import Session
+from fastapi_cache.decorator import cache
 
 from app.database import get_db
 from app.schemas.analytics import TaskSummary, UserPerformance, TaskTrends
 from app.services import analytics_service
 from app.utils.auth import get_current_user
+from app.utils.cache import user_key_builder
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +18,7 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
 
 
 @router.get("/tasks/summary", response_model=TaskSummary, status_code=status.HTTP_200_OK)
+@cache(expire=30, key_builder=user_key_builder)
 def get_task_summary(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
@@ -26,6 +29,7 @@ def get_task_summary(
 
 
 @router.get("/summary", response_model=TaskSummary, status_code=status.HTTP_200_OK)
+@cache(expire=30, key_builder=user_key_builder)
 def get_task_summary_alias(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
@@ -35,6 +39,7 @@ def get_task_summary_alias(
 
 
 @router.get("/users/performance", response_model=List[UserPerformance], status_code=status.HTTP_200_OK)
+@cache(expire=60, key_builder=user_key_builder)
 def get_user_performance(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
@@ -44,6 +49,7 @@ def get_user_performance(
 
 
 @router.get("/tasks/trends", response_model=TaskTrends, status_code=status.HTTP_200_OK)
+@cache(expire=60, key_builder=user_key_builder)
 def get_task_trends(
     days: int = Query(30),
     db: Session = Depends(get_db),

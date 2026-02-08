@@ -7,6 +7,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.task import Task
+from app.models.user import User
 from app.schemas.task import TaskCreate, BulkTaskCreate
 
 logger = logging.getLogger(__name__)
@@ -21,12 +22,21 @@ def create_bulk_tasks(
     try:
         created_tasks = []
         for task_data in bulk_create.tasks:
-            tags_json = json.dumps(task_data.tags) if task_data.tags else None
+            if task_data.assigned_to is not None:
+                assigned_user = db.query(User).filter(User.id == task_data.assigned_to).first()
+                if not assigned_user:
+                    raise ValueError("Assigned user not found")
+            status_value = task_data.status or "todo"
+            completed_value = status_value == "done"
+            completed_at = datetime.utcnow() if completed_value else None
+            tags_json = json.dumps(task_data.tags) if task_data.tags is not None else None
             task = Task(
                 title=task_data.title,
                 description=task_data.description,
                 priority=task_data.priority or "medium",
-                status=task_data.status or "todo",
+                status=status_value,
+                completed=completed_value,
+                completed_at=completed_at,
                 due_date=task_data.due_date,
                 tags=tags_json,
                 assigned_to=task_data.assigned_to,

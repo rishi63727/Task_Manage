@@ -5,6 +5,25 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
+ALLOWED_PRIORITIES = {"low", "medium", "high"}
+ALLOWED_STATUSES = {"todo", "in_progress", "done"}
+
+
+def _normalize_status(value: str) -> str:
+    return value.strip().lower().replace("-", "_")
+
+
+def _normalize_priority(value: str) -> str:
+    return value.strip().lower()
+
+
+def _normalize_tags(tags: Optional[List[str]]) -> Optional[List[str]]:
+    if tags is None:
+        return None
+    cleaned = [t.strip() for t in tags if t and t.strip()]
+    return cleaned
+
+
 class TaskCreate(BaseModel):
     """Schema for creating a new task."""
     title: str
@@ -14,6 +33,37 @@ class TaskCreate(BaseModel):
     due_date: Optional[datetime] = None
     tags: Optional[List[str]] = None
     assigned_to: Optional[int] = None
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def validate_priority(cls, v):
+        if v is None:
+            return v
+        value = _normalize_priority(str(v))
+        if value not in ALLOWED_PRIORITIES:
+            raise ValueError("priority must be one of: low, medium, high")
+        return value
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v):
+        if v is None:
+            return v
+        value = _normalize_status(str(v))
+        if value not in ALLOWED_STATUSES:
+            raise ValueError("status must be one of: todo, in_progress, done")
+        return value
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def validate_tags(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = [t.strip() for t in v.split(",")]
+        if isinstance(v, list):
+            return _normalize_tags(v)
+        raise ValueError("tags must be a list of strings")
 
 
 class BulkTaskCreate(BaseModel):
@@ -73,3 +123,33 @@ class TaskUpdate(BaseModel):
     tags: Optional[List[str]] = None
     assigned_to: Optional[int] = None
 
+    @field_validator("priority", mode="before")
+    @classmethod
+    def validate_priority(cls, v):
+        if v is None:
+            return v
+        value = _normalize_priority(str(v))
+        if value not in ALLOWED_PRIORITIES:
+            raise ValueError("priority must be one of: low, medium, high")
+        return value
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v):
+        if v is None:
+            return v
+        value = _normalize_status(str(v))
+        if value not in ALLOWED_STATUSES:
+            raise ValueError("status must be one of: todo, in_progress, done")
+        return value
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def validate_tags(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = [t.strip() for t in v.split(",")]
+        if isinstance(v, list):
+            return _normalize_tags(v)
+        raise ValueError("tags must be a list of strings")

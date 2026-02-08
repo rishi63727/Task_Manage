@@ -34,7 +34,6 @@ function DashboardPage() {
     };
 
     fetchData();
-    fetchData();
   }, []);
 
   const { lastMessage } = useWebSocket('/ws');
@@ -87,8 +86,8 @@ function DashboardPage() {
       color: 'blue',
     },
     {
-      label: 'In Progress',
-      value: summary?.pending.toString() || '0', // Using pending as proxy for In Progress or Todo based on API. Backend says "pending", UI says "In Progress".
+      label: 'Pending',
+      value: summary?.pending.toString() || '0',
       color: 'orange',
     },
     {
@@ -103,68 +102,30 @@ function DashboardPage() {
     },
   ];
 
-  // Filter tasks for the lists - assuming backend returns mixed status
-  // Note: Backend might define "completed" boolean instead of status string.
-  // Let's check the Task type definition we just made.
-  // Task type has `completed: boolean`. 
-  // It doesn't seem to have a 'status' string field in the backend response based on `TaskResponse` schema in `task.py`.
-  // Wait, `TaskResponse` has `completed: bool`. 
-  // The UI expects 'status' string ('in-progress', 'todo', 'done').
-  // We need to map `completed` bool to these statuses or adjust the UI.
-  // However, the `task.py` schema has `completed` bool.
-  // But `TasksPage` and `taskStore` use `status` string. 
-  // Let's look at `TaskCreate` in `task.py`. It has `priority` string, but no status/completed field?
-  // `TaskUpdate` has `completed`.
-  // It seems the backend treats tasks as simpler: completed or not.
-  // The frontend has 'backlog', 'todo', 'in-progress', 'review', 'done'.
-  // Mismatch detected.
-  // I will map:
-  // completed=true -> 'done'
-  // completed=false -> 'in-progress' (or 'todo'?)
-  // For now, I'll treat !completed as 'in-progress' for the left column and 'todo' for the right?
-  // Actually, without a status field, I can't distinguish between 'todo' and 'in-progress'.
-  // I will put all !completed tasks in "To Do" and completed in "Completed"?
-  // But the UI has "In Progress" and "To Do" columns.
-  // I'll put all !completed tasks in "In Progress" if they are assigned (conceptually) or just split them arbitrarily?
-  // No, that's bad.
-  // Let's look at `TaskResponse` again. It has `completed: bool`.
-  // And `priority`. 
-  // The existing frontend `Task` interface in `taskStore` has `status` string.
-  // The backend `TaskResponse` only has `completed` boolean.
-  // This implies the backend doesn't support the granular statuses the frontend expects.
-  // I will adapt the frontend to use `completed` boolean.
-  // In Dashboard code:
-  // "In Progress" column -> !completed tasks
-  // "To Do" column -> maybe we treat them same as In Progress or empty?
-  // Let's just put all active tasks in "In Progress" for now to show data.
+  const normalizeStatus = (value?: string) => {
+    const normalized = (value || '').toLowerCase().replace('-', '_');
+    return normalized || 'todo';
+  };
 
-  const activeTasks = tasks.filter((t) => !t.completed);
-  // We can't distinguish 'todo' from 'in-progress' with current API.
-  // I'll just list active tasks in the first column and maybe high priority in the second?
-  // Or just list all active in existing 'In Progress' column and leave 'To Do' empty or hide it?
-  // I will modify the columns to be meaningful with available data.
-  // "Active Tasks" and "Recent Completed"?
-  // The prompt asks to "Replace hardcoded stats cards with API data".
-  // "Display correct values for: Total Tasks, In Progress (pending), Completed, High Priority".
-  // Backend "pending" likely maps to !completed.
-
-  // Mapping for TaskCard compatibility:
-  // TaskCard expects `task` prop with `status` field.
-  // I need to adapt the API Task to the Component Task props on the fly
-  // or update TaskCard. Updating TaskCard might break other pages.
-  // I will cast/map the data before passing to TaskCard.
+  const activeTasks = tasks.filter((t) => normalizeStatus(t.status) !== 'done' && !t.completed);
 
   const mapToUiTask = (apiTask: Task): any => ({
     ...apiTask,
-    id: apiTask.id.toString(), // Frontend uses string IDs usually? Store used string. API uses int.
-    status: apiTask.completed ? 'done' : 'in-progress', // Mapping active to in-progress
-    assignee: 'Me', // API doesn't return assignee name, only owner_id.
-    dueDate: null, // API doesn't seem to have due date in standard response logic? `created_at` is there.
+    id: apiTask.id.toString(),
+    status: normalizeStatus(apiTask.status || (apiTask.completed ? 'done' : 'todo')),
+    assignee: apiTask.assigned_to ? `User ${apiTask.assigned_to}` : undefined,
+    dueDate: apiTask.due_date ? new Date(apiTask.due_date).toLocaleDateString() : undefined,
   });
 
-  const inProgressTasks = activeTasks.map(mapToUiTask);
-  // For the second column, maybe show High Priority tasks?
-  const highPriorityTasks = activeTasks.filter(t => t.priority === 'high' || t.priority === 'critical').map(mapToUiTask);
+  const inProgressTasks = activeTasks
+    .filter((t) => normalizeStatus(t.status) === 'in_progress')
+    .map(mapToUiTask);
+  const todoTasks = activeTasks
+    .filter((t) => normalizeStatus(t.status) === 'todo')
+    .map(mapToUiTask);
+  const highPriorityTasks = activeTasks
+    .filter(t => t.priority === 'high')
+    .map(mapToUiTask);
 
   return (
     <div className={styles.dashboard}>
@@ -181,7 +142,7 @@ function DashboardPage() {
 
       <div className={styles.tasksSection}>
         <div className={styles.column}>
-          <h2>Active Tasks</h2>
+          <h2>In Progress</h2>
           <div className={styles.taskList}>
             {inProgressTasks.length > 0 ? (
               inProgressTasks.slice(0, 5).map((task) => (
@@ -193,6 +154,21 @@ function DashboardPage() {
           </div>
         </div>
 
+        <div className={styles.column}>
+          <h2>To Do</h2>
+          <div className={styles.taskList}>
+            {todoTasks.length > 0 ? (
+              todoTasks.slice(0, 5).map((task) => (
+                <TaskCard key={task.id} task={task} />
+              ))
+            ) : (
+              <p className={styles.empty}>No tasks to do</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.tasksSection} style={{ marginTop: '2rem' }}>
         <div className={styles.column}>
           <h2>High Priority</h2>
           <div className={styles.taskList}>

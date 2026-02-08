@@ -43,12 +43,25 @@ def get_task_summary(db: Session, user_id: int) -> TaskSummary:
     by_priority = {"low": 0, "medium": 0, "high": 0}
     for p, count in priority_counts:
         by_priority[p] = count
+
+    status_counts = db.query(
+        Task.status,
+        func.count(Task.id)
+    ).filter(
+        Task.owner_id == user_id,
+        Task.is_deleted == False
+    ).group_by(Task.status).all()
+
+    by_status = {"todo": 0, "in_progress": 0, "done": 0}
+    for s, count in status_counts:
+        by_status[s] = count
     
     return TaskSummary(
         total=total,
         completed=completed,
         pending=pending,
-        by_priority=by_priority
+        by_priority=by_priority,
+        by_status=by_status
     )
 
 

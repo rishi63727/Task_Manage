@@ -1,4 +1,5 @@
 import logging
+import os
 
 from dotenv import load_dotenv
 
@@ -14,6 +15,10 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from sqlalchemy.exc import SQLAlchemyError
+
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+import redis.asyncio as redis
 
 from app.database import Base, engine
 from app.models import user as _  # noqa: F401
@@ -45,6 +50,18 @@ app.add_middleware(
 
 # Apply SlowAPI middleware for rate limiting
 app.add_middleware(SlowAPIMiddleware)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize cache backend (Redis) for analytics endpoints."""
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    try:
+        redis_client = redis.from_url(redis_url, encoding="utf8", decode_responses=True)
+        FastAPICache.init(RedisBackend(redis_client), prefix="task-cache")
+        logger.info("Cache initialized with Redis backend")
+    except Exception as exc:
+        logger.warning("Cache initialization failed: %s", exc)
 
 # Include routers
 app.include_router(exports.router)

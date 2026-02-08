@@ -10,6 +10,7 @@ export interface TaskCardTask {
   status?: string
   assignee?: string
   dueDate?: string
+  due_date?: string | null
   created_at?: string
 }
 
@@ -26,19 +27,22 @@ const priorityColors: Record<string, string> = {
 }
 
 function TaskCard({ task, onClick }: TaskCardProps) {
-  const statusLabel = task.completed === true
+  const normalizedStatus = (task.status || '').toLowerCase().replace('-', '_')
+  const statusLabel = task.completed === true || normalizedStatus === 'done'
     ? 'Done'
-    : task.status === 'backlog'
+    : normalizedStatus === 'backlog'
       ? 'Backlog'
-      : task.status === 'todo'
-        ? 'To Do'
-        : task.status === 'in-progress'
-          ? 'In Progress'
-          : task.status === 'review'
-            ? 'Review'
-            : task.status === 'done'
-              ? 'Done'
-              : 'To Do'
+      : normalizedStatus === 'in_progress'
+        ? 'In Progress'
+        : normalizedStatus === 'review'
+          ? 'Review'
+          : normalizedStatus === 'todo'
+            ? 'To Do'
+            : 'To Do'
+
+  const dueDate =
+    task.dueDate ||
+    (task.due_date ? new Date(task.due_date).toLocaleDateString() : undefined)
 
   return (
     <div className={styles.card} onClick={onClick} style={onClick ? { cursor: 'pointer' } : {}}>
@@ -63,8 +67,8 @@ function TaskCard({ task, onClick }: TaskCardProps) {
         )}
       </div>
 
-      {task.dueDate && (
-        <div className={styles.dueDate}>Due: {task.dueDate}</div>
+      {dueDate && (
+        <div className={styles.dueDate}>Due: {dueDate}</div>
       )}
     </div>
   )

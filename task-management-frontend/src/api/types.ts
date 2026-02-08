@@ -23,6 +23,11 @@ export interface AnalyticsSummary {
         medium: number;
         high: number;
     };
+    by_status?: {
+        todo: number;
+        in_progress: number;
+        done: number;
+    };
 }
 
 export interface UserPerformance {

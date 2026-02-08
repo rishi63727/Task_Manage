@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.task import Task
+from app.models.user import User
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate, BulkTaskCreate, BulkTaskResponse
 from app.services import task_service
 from app.services.websocket_manager import manager
@@ -56,12 +57,24 @@ def create_task(
     current_user=Depends(get_current_user)
 ):
     """Create a new task for the authenticated user. Returns 201 on success."""
-    tags_json = json.dumps(task.tags) if task.tags else None
+    from datetime import datetime
+
+    if task.assigned_to is not None:
+        assigned_user = db.query(User).filter(User.id == task.assigned_to).first()
+        if not assigned_user:
+            raise HTTPException(status_code=400, detail="Assigned user not found")
+
+    status_value = task.status or "todo"
+    completed_value = status_value == "done"
+    completed_at = datetime.utcnow() if completed_value else None
+    tags_json = json.dumps(task.tags) if task.tags is not None else None
     new_task = Task(
         title=task.title,
         description=task.description,
         priority=task.priority or "medium",
-        status=task.status or "todo",
+        status=status_value,
+        completed=completed_value,
+        completed_at=completed_at,
         due_date=task.due_date,
         tags=tags_json,
         assigned_to=task.assigned_to,
@@ -186,25 +199,42 @@ def update_task(
     if task_update.description is not None:
         task.description = task_update.description
         updated = True
-    if task_update.completed is not None:
-        task.completed = task_update.completed
-        if task_update.completed and not task.completed_at:
-            task.completed_at = datetime.utcnow()
-        updated = True
     if task_update.priority is not None:
         task.priority = task_update.priority
         updated = True
     if task_update.status is not None:
         task.status = task_update.status
+        if task_update.status == "done":
+            task.completed = True
+            if not task.completed_at:
+                task.completed_at = datetime.utcnow()
+        else:
+            task.completed = False
+            task.completed_at = None
         updated = True
-    if task_update.due_date is not None:
+    if "due_date" in task_update.model_fields_set:
         task.due_date = task_update.due_date
         updated = True
-    if task_update.tags is not None:
-        task.tags = json.dumps(task_update.tags)
+    if "tags" in task_update.model_fields_set:
+        task.tags = json.dumps(task_update.tags) if task_update.tags is not None else None
         updated = True
-    if task_update.assigned_to is not None:
+    if "assigned_to" in task_update.model_fields_set:
+        if task_update.assigned_to is not None:
+            assigned_user = db.query(User).filter(User.id == task_update.assigned_to).first()
+            if not assigned_user:
+                raise HTTPException(status_code=400, detail="Assigned user not found")
         task.assigned_to = task_update.assigned_to
+        updated = True
+    if task_update.completed is not None:
+        task.completed = task_update.completed
+        if task_update.completed:
+            task.status = "done"
+            if not task.completed_at:
+                task.completed_at = datetime.utcnow()
+        else:
+            if task.status == "done":
+                task.status = "todo"
+            task.completed_at = None
         updated = True
 
     if updated:

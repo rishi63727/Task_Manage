@@ -23,16 +23,24 @@ function TasksPage() {
   const [searchInput, setSearchInput] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [completedFilter, setCompletedFilter] = useState<'all' | 'todo' | 'done'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'todo' | 'in_progress' | 'done'>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [formData, setFormData] = useState<{
     title: string;
     description: string;
     priority: 'low' | 'medium' | 'high';
+    status: 'todo' | 'in_progress' | 'done';
+    due_date: string;
+    tags: string;
+    assigned_to: string;
   }>({
     title: '',
     description: '',
     priority: 'medium',
+    status: 'todo',
+    due_date: '',
+    tags: '',
+    assigned_to: '',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,8 +55,7 @@ function TasksPage() {
         sort_order: sortOrder,
       };
       if (searchQuery.trim()) params.q = searchQuery.trim();
-      if (completedFilter === 'todo') params.completed = false;
-      if (completedFilter === 'done') params.completed = true;
+      if (statusFilter !== 'all') params.status = statusFilter;
       if (priorityFilter !== 'all') params.priority = priorityFilter;
       const data = await getTasks(params);
       setTasks(Array.isArray(data) ? data : (data as { items?: Task[] }).items ?? []);
@@ -63,7 +70,7 @@ function TasksPage() {
 
   useEffect(() => {
     loadTasks();
-  }, [page, completedFilter, priorityFilter, searchQuery, sortBy, sortOrder]);
+  }, [page, statusFilter, priorityFilter, searchQuery, sortBy, sortOrder]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,8 +87,22 @@ function TasksPage() {
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
         priority: formData.priority,
+        status: formData.status,
+        due_date: formData.due_date ? new Date(formData.due_date).toISOString() : undefined,
+        tags: formData.tags
+          ? formData.tags.split(',').map((t) => t.trim()).filter(Boolean)
+          : undefined,
+        assigned_to: formData.assigned_to ? Number(formData.assigned_to) : undefined,
       });
-      setFormData({ title: '', description: '', priority: 'medium' });
+      setFormData({
+        title: '',
+        description: '',
+        priority: 'medium',
+        status: 'todo',
+        due_date: '',
+        tags: '',
+        assigned_to: '',
+      });
       setShowForm(false);
       await loadTasks();
     } catch (err) {
@@ -133,6 +154,19 @@ function TasksPage() {
               }
             />
             <select
+              value={formData.status}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  status: e.target.value as 'todo' | 'in_progress' | 'done',
+                })
+              }
+            >
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+            <select
               value={formData.priority}
               onChange={(e) =>
                 setFormData({
@@ -145,6 +179,24 @@ function TasksPage() {
               <option value="medium">Medium Priority</option>
               <option value="high">High Priority</option>
             </select>
+            <input
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Tags (comma-separated)"
+              value={formData.tags}
+              onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+            />
+            <input
+              type="number"
+              placeholder="Assign to user ID (optional)"
+              value={formData.assigned_to}
+              onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
+              min={1}
+            />
             <div className={styles.formActions}>
               <button type="submit" className={styles.submitButton} disabled={submitting}>
                 {submitting ? 'Creating...' : 'Create Task'}
@@ -198,13 +250,14 @@ function TasksPage() {
         {[
           { value: 'all', label: 'All' },
           { value: 'todo', label: 'To Do' },
+          { value: 'in_progress', label: 'In Progress' },
           { value: 'done', label: 'Done' },
         ].map((option) => (
           <button
             key={option.value}
-            className={`${styles.filterButton} ${completedFilter === option.value ? styles.active : ''
+            className={`${styles.filterButton} ${statusFilter === option.value ? styles.active : ''
               }`}
-            onClick={() => { setCompletedFilter(option.value as 'all' | 'todo' | 'done'); setPage(1); }}
+            onClick={() => { setStatusFilter(option.value as 'all' | 'todo' | 'in_progress' | 'done'); setPage(1); }}
           >
             {option.label}
           </button>
@@ -236,6 +289,8 @@ function TasksPage() {
                   task={{
                     ...task,
                     completed: task.completed,
+                    status: task.status,
+                    dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : undefined,
                   }}
                   onClick={() => setSelectedTask(task)}
                 />
