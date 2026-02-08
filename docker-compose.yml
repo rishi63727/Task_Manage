@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      # Add other env vars here or use .env file
+      - DATABASE_URL=sqlite:///./app.db # Or postgres container
+    depends_on:
+      - redis
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build: ./task-management-frontend
+    ports:
+      - "4173:4173" # Vite preview port
+    environment:
+      - VITE_API_URL=http://localhost:8000 # Browser access
+    depends_on:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
