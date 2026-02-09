@@ -1,47 +1,61 @@
-import api from './base';
-import { Task, TaskCreateRequest, TaskUpdateRequest, Comment, CommentCreateRequest } from '../types';
+import { request } from './client'
+import type { Task, TaskCreate, TaskUpdate } from '../types'
 
-export const getTasks = async (params?: { status?: string; priority?: string; search?: string }) => {
-  const response = await api.get('/api/v1/tasks', { params });
-  return response.data;
-};
+export interface TaskListParams {
+  q?: string
+  priority?: string
+  status?: string
+  limit?: number
+  offset?: number
+  sort_by?: string
+  sort_order?: string
+}
 
-export const getTask = async (id: number): Promise<Task> => {
-  const response = await api.get(`/api/v1/tasks/${id}`);
-  return response.data;
-};
+export interface BulkTaskResponse {
+  created: number
+  tasks: Task[]
+}
 
-export const createTask = async (data: TaskCreateRequest): Promise<Task> => {
-  const response = await api.post('/api/v1/tasks', data);
-  return response.data;
-};
+export const tasksAPI = {
+  getTasks(params: TaskListParams = {}): Promise<Task[]> {
+    const sp = new URLSearchParams()
+    if (params.q) sp.set('q', params.q)
+    if (params.priority) sp.set('priority', params.priority)
+    if (params.status) sp.set('status', params.status)
+    if (params.limit != null) sp.set('limit', String(params.limit))
+    if (params.offset != null) sp.set('offset', String(params.offset))
+    if (params.sort_by) sp.set('sort_by', params.sort_by)
+    if (params.sort_order) sp.set('sort_order', params.sort_order)
+    const query = sp.toString()
+    return request<Task[]>(`/api/v1/tasks${query ? `?${query}` : ''}`)
+  },
 
-export const updateTask = async (id: number, data: TaskUpdateRequest): Promise<Task> => {
-  const response = await api.put(`/api/v1/tasks/${id}`, data);
-  return response.data;
-};
+  getTask(id: number): Promise<Task> {
+    return request<Task>(`/api/v1/tasks/${id}`)
+  },
 
-export const deleteTask = async (id: number) => {
-  const response = await api.delete(`/api/v1/tasks/${id}`);
-  return response.data;
-};
+  createTask(data: TaskCreate): Promise<Task> {
+    return request<Task>('/api/v1/tasks/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
 
-export const getTaskComments = async (taskId: number): Promise<Comment[]> => {
-  const response = await api.get(`/api/v1/tasks/${taskId}/comments`);
-  return response.data;
-};
+  updateTask(id: number, data: TaskUpdate): Promise<Task> {
+    return request<Task>(`/api/v1/tasks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
 
-export const createTaskComment = async (data: CommentCreateRequest): Promise<Comment> => {
-  const response = await api.post(`/api/v1/tasks/${data.task_id}/comments`, data);
-  return response.data;
-};
+  deleteTask(id: number): Promise<void> {
+    return request<void>(`/api/v1/tasks/${id}`, { method: 'DELETE' })
+  },
 
-export const updateTaskComment = async (taskId: number, commentId: number, content: string): Promise<Comment> => {
-  const response = await api.put(`/api/v1/tasks/${taskId}/comments/${commentId}`, { content });
-  return response.data;
-};
-
-export const deleteTaskComment = async (taskId: number, commentId: number) => {
-  const response = await api.delete(`/api/v1/tasks/${taskId}/comments/${commentId}`);
-  return response.data;
-};
+  createBulkTasks(tasks: TaskCreate[]): Promise<BulkTaskResponse> {
+    return request<BulkTaskResponse>('/api/v1/tasks/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ tasks }),
+    })
+  },
+}

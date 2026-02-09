@@ -194,19 +194,22 @@ def update_task(
     updated = False
 
     # Handle status update - status is the single source of truth
-    if task_update.status is not None:
-        new_status = normalize_status(task_update.status)
+    # Use model_fields_set so we apply status when client explicitly sent it (even if value was normalized)
+    if "status" in task_update.model_fields_set and task_update.status is not None:
+        new_status = normalize_status(str(task_update.status))
+        current_status = normalize_status(str(task.status or "todo"))
 
-        if task.status != new_status:
+        if current_status != new_status:
             task.status = new_status
             updated = True
+            logger.info("Task %s status: %s -> %s", task_id, current_status, new_status)
 
         # Derive completed from status
         if task.status == "done":
             if not task.completed:
                 task.completed = True
                 updated = True
-            if not task.completed_at:
+            if task.completed_at is None:
                 task.completed_at = datetime.utcnow()
                 updated = True
         else:
@@ -216,7 +219,20 @@ def update_task(
             if task.completed_at is not None:
                 task.completed_at = None
                 updated = True
-    
+    elif task_update.status is not None:
+        # Client sent status in body but it wasn't in model_fields_set (edge case); still apply
+        new_status = normalize_status(str(task_update.status))
+        current_status = normalize_status(str(task.status or "todo"))
+        if current_status != new_status:
+            task.status = new_status
+            updated = True
+            if task.status == "done":
+                task.completed = True
+                task.completed_at = task.completed_at or datetime.utcnow()
+            else:
+                task.completed = False
+                task.completed_at = None
+
     # Handle other fields
     if task_update.title is not None:
         task.title = task_update.title

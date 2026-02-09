@@ -38,8 +38,12 @@ def export_tasks(
         Task.is_deleted == False
     )
     
+    # Single source of truth: filter by status, not completed
     if completed is not None:
-        query = query.filter(Task.completed == completed)
+        if completed:
+            query = query.filter(Task.status == "done")
+        else:
+            query = query.filter(Task.status != "done")
     
     if priority:
         query = query.filter(Task.priority == priority)

@@ -1,64 +1,75 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import AuthLayout from '../components/AuthLayout';
-import { useAuth } from '../state/AuthContext';
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
-const Login: React.FC = () => {
-  const { login, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState<string | null>(null);
+export function Login() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { login } = useAuth()
+  const navigate = useNavigate()
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    if (!form.email || !form.password) {
-      setError('Enter your email and password.');
-      return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (!email.trim()) {
+      setError('Email is required')
+      return
     }
+    if (!password) {
+      setError('Password is required')
+      return
+    }
+    setLoading(true)
     try {
-      await login(form);
-      navigate('/');
+      await login(email.trim(), password)
+      navigate('/dashboard', { replace: true })
     } catch (err) {
-      setError('Login failed. Check your credentials.');
+      setError(err instanceof Error ? err.message : 'Login failed')
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <AuthLayout>
-      <form className="form" onSubmit={handleSubmit}>
-        <h1>Welcome back</h1>
-        <p>Sign in to view the latest tasks and insights.</p>
-        {error && <div className="alert alert-error">{error}</div>}
-        <label>
-          Email
-          <input
-            type="email"
-            value={form.email}
-            onChange={(event) => setForm({ ...form, email: event.target.value })}
-            placeholder="you@company.com"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={form.password}
-            onChange={(event) => setForm({ ...form, password: event.target.value })}
-            placeholder="••••••••"
-            required
-          />
-        </label>
-        <button className="btn btn-primary" type="submit" disabled={isLoading}>
-          {isLoading ? 'Signing in…' : 'Sign in'}
-        </button>
-        <p className="form-footer">
-          New here? <Link to="/register">Create an account</Link>
+    <div className="card" style={{ maxWidth: 400, margin: '2rem auto' }}>
+      <div className="card-header">Log in</div>
+      <div className="card-body">
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="login-email">Email</label>
+            <input
+              id="login-email"
+              type="email"
+              className="form-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              autoFocus
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              type="password"
+              className="form-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          {error && <p className="form-error">{error}</p>}
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem' }} disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+        <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+          Don't have an account? <Link to="/register">Register</Link>
         </p>
-      </form>
-    </AuthLayout>
-  );
-};
-
-export default Login;
+      </div>
+    </div>
+  )
+}

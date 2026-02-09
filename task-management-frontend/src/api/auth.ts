@@ -1,17 +1,30 @@
-import api from './base';
-import { User, LoginRequest, RegisterRequest } from '../types';
+import { request } from './client'
+import type { AuthResponse, User } from '../types'
 
-export const login = async (data: LoginRequest) => {
-  const response = await api.post('/api/v1/auth/login', data);
-  return response.data;
-};
+export const authAPI = {
+  async register(email: string, password: string): Promise<AuthResponse> {
+    const data = await request<AuthResponse>('/api/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+    if (data.access_token) localStorage.setItem('token', data.access_token)
+    return data
+  },
 
-export const register = async (data: RegisterRequest) => {
-  const response = await api.post('/api/v1/auth/register', data);
-  return response.data;
-};
+  async login(email: string, password: string): Promise<AuthResponse> {
+    const data = await request<AuthResponse>('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+    if (data.access_token) localStorage.setItem('token', data.access_token)
+    return data
+  },
 
-export const getCurrentUser = async (): Promise<User> => {
-  const response = await api.get('/api/v1/auth/me');
-  return response.data;
-};
+  async getMe(): Promise<User> {
+    return request<User>('/me')
+  },
+
+  logout(): void {
+    localStorage.removeItem('token')
+  },
+}

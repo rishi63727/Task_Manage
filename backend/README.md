@@ -29,28 +29,40 @@ A production-ready FastAPI backend for task management with user authentication,
 
 ### Prerequisites
 
-- Python 3.8+
-- pip or poetry
+- **Python 3.11** (recommended; use `py -0` on Windows to see installed versions)
+- pip
 
-### Installation
+### Installation (exact steps — use Python 3.11)
 
-1. Clone the repository and navigate to the backend directory:
+**All commands below are from the `backend/` folder.** Use PowerShell syntax if you're in PowerShell.
+
+1. Go to the backend directory:
 ```bash
 cd backend
 ```
 
-2. Create a virtual environment:
+2. **Delete any broken venv** (if present):
+   - **PowerShell:** `Remove-Item -Recurse -Force venv -ErrorAction SilentlyContinue`
+   - **CMD:** `rmdir /s /q venv`
+
+3. **Create a venv with Python 3.11:**
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+py -0
+py -3.11 -m venv venv
 ```
 
-3. Install dependencies:
+4. **Activate the venv:**
 ```bash
+venv\Scripts\activate
+```
+
+5. **Install dependencies:**
+```bash
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-4. Create a `.env` file with the following variables:
+6. Create a `.env` file with the following variables:
 ```
 DATABASE_URL=sqlite:///./test.db
 SECRET_KEY=your-secret-key-here-change-in-production
@@ -59,6 +71,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
 ### Running the Server
+
+**With the venv activated**, run:
 
 ```bash
 python -m uvicorn app.main:app --reload
