@@ -11,7 +11,11 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
 
-    tasks = relationship("Task", back_populates="owner")
+    tasks = relationship(
+        "Task",
+        back_populates="owner",
+        foreign_keys="Task.owner_id",
+    )
     comments = relationship("Comment", back_populates="user")
 
 

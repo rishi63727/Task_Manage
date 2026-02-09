@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { analyticsAPI } from '../api'
+import { connectSocket, disconnectSocket } from '../services/socket'
 import type { TaskSummary } from '../types'
 
 export function Dashboard() {
@@ -10,8 +11,18 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const refetchSummary = useCallback(() => {
+    setError(null)
+    analyticsAPI
+      .getTaskSummary()
+      .then(setSummary)
+      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
+      .finally(() => setLoading(false))
+  }, [])
+
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
     analyticsAPI
       .getTaskSummary()
       .then((data) => {
@@ -27,6 +38,19 @@ export function Dashboard() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    connectSocket((event) => {
+      switch (event.type) {
+        case 'TASK_CREATED':
+        case 'TASK_UPDATED':
+        case 'TASK_DELETED':
+          refetchSummary()
+          break
+      }
+    })
+    return () => disconnectSocket()
+  }, [refetchSummary])
 
   return (
     <Layout>

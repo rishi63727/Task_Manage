@@ -1,9 +1,10 @@
-import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -22,6 +23,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/tasks">Tasks</Link>
           <Link to="/analytics">Analytics</Link>
           <Link to="/profile">Profile</Link>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{user?.email}</span>
           <button type="button" className="btn btn-ghost" onClick={handleLogout}>
             Log out

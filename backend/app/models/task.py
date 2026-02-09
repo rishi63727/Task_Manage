@@ -44,7 +44,6 @@ class Task(Base):
         Index('ix_tasks_owner_id', 'owner_id'),
         Index('ix_tasks_completed', 'completed'),
         Index('ix_tasks_created_at', 'created_at'),
-        Index('ix_tasks_status', 'status'),
         Index('ix_tasks_due_date', 'due_date'),
     )
 

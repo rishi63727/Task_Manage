@@ -17,8 +17,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Read secrets and configuration from environment variables
-# SECRET_KEY must be set in environment or .env file
-SECRET_KEY = os.getenv("SECRET_KEY")
+# SECRET_KEY must be set in production; dev fallback avoids 500 on login when .env is missing
+SECRET_KEY = os.getenv("SECRET_KEY") or "dev-secret-key-change-in-production"
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
@@ -36,10 +36,15 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password."""
+    if not hashed_password:
+        return False
     raw = plain_password.encode("utf-8")
     if len(raw) > 72:
         raw = raw[:72]
-    return bcrypt.checkpw(raw, hashed_password.encode("utf-8"))
+    try:
+        return bcrypt.checkpw(raw, hashed_password.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:

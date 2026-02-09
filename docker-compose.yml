@@ -1,29 +1,47 @@
-version: '3.8'
-
 services:
   backend:
     build: ./backend
+    container_name: autonize-backend
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/autonize
       - REDIS_URL=redis://redis:6379/0
-      # Add other env vars here or use .env file
-      - DATABASE_URL=sqlite:///./app.db # Or postgres container
     depends_on:
+      - db
       - redis
     volumes:
       - ./backend:/app
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    container_name: autonize-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: autonize
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: autonize-redis
+    ports:
+      - "6379:6379"
 
   frontend:
     build: ./task-management-frontend
     ports:
-      - "4173:4173" # Vite preview port
+      - "4173:4173"
     environment:
-      - VITE_API_URL=http://localhost:8000 # Browser access
+      - VITE_API_URL=http://localhost:8000
     depends_on:
       - backend
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
+volumes:
+  postgres_data:

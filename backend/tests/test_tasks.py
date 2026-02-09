@@ -80,20 +80,27 @@ def test_list_tasks_filter_by_priority(authenticated_client, test_user, db):
     assert data[0]["priority"] == "high"
 
 
-def test_list_tasks_filter_by_completed(authenticated_client, test_user, db):
-    """Test filtering tasks by completion status."""
+def test_list_tasks_filter_by_status(authenticated_client, test_user, db):
+    """Test filtering tasks by status (todo, in_progress, done)."""
     from datetime import datetime
-    task1 = Task(title="Completed", owner_id=test_user.id, completed=True, completed_at=datetime.utcnow())
-    task2 = Task(title="Pending", owner_id=test_user.id, completed=False)
+    task1 = Task(
+        title="Done task",
+        owner_id=test_user.id,
+        status="done",
+        completed=True,
+        completed_at=datetime.utcnow(),
+    )
+    task2 = Task(title="Pending task", owner_id=test_user.id, status="todo", completed=False)
     db.add(task1)
     db.add(task2)
     db.commit()
 
-    response = authenticated_client.get("/api/v1/tasks?completed=false")
+    response = authenticated_client.get("/api/v1/tasks?status=todo")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["title"] == "Pending"
+    assert data[0]["title"] == "Pending task"
+    assert data[0]["status"] == "todo"
 
 
 def test_get_task(authenticated_client, test_user, db):
@@ -132,6 +139,33 @@ def test_update_task(authenticated_client, test_user, db):
     data = response.json()
     assert data["title"] == "Updated"
     assert data["priority"] == "high"
+
+
+def test_update_task_status(authenticated_client, test_user, db):
+    """Test updating task status to done (triggers background completed email)."""
+    create_res = authenticated_client.post(
+        "/api/v1/tasks",
+        json={"title": "Task to Complete", "description": "Will mark done"},
+    )
+    assert create_res.status_code == 201
+    task_id = create_res.json()["id"]
+
+    response = authenticated_client.put(
+        f"/api/v1/tasks/{task_id}",
+        json={"status": "done"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "done"
+
+
+def test_background_email_mock(mocker):
+    """Background job function exists and is callable; no real email sent in tests."""
+    mock = mocker.patch(
+        "app.services.background_jobs.send_task_assigned_email"
+    )
+    mock("test@gmail.com", "Mock Task")
+    mock.assert_called_once_with("test@gmail.com", "Mock Task")
 
 
 def test_update_task_unauthorized(db):

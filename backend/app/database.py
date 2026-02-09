@@ -6,14 +6,15 @@ import os
 
 load_dotenv()
 
+# Default SQLite for dev when .env is missing
+DATABASE_URL = os.getenv("DATABASE_URL") or "sqlite:///./app.db"
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Only SQLite needs check_same_thread=False; other drivers ignore or reject it
+engine_kwargs = {}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
 
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 SessionLocal = sessionmaker(
     autocommit=False,

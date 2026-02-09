@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { tasksAPI } from '../api'
+import { useUsers } from '../context/UsersContext'
 import { TASK_STATUS, getTaskStatus, formatStatusLabel } from '../utils/taskStatus'
 import type { TaskCreate } from '../types'
 
@@ -11,6 +12,7 @@ const PRIORITIES = ['low', 'medium', 'high']
 export function TaskForm() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { users } = useUsers()
   const isEdit = id && id !== 'new'
   const taskId = isEdit ? parseInt(id, 10) : NaN
 
@@ -20,6 +22,7 @@ export function TaskForm() {
   const [priority, setPriority] = useState('medium')
   const [dueDate, setDueDate] = useState('')
   const [tagsStr, setTagsStr] = useState('')
+  const [assignedTo, setAssignedTo] = useState<number | null>(null)
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +40,7 @@ export function TaskForm() {
         setPriority(t.priority ?? 'medium')
         setDueDate(t.due_date ? t.due_date.slice(0, 16) : '')
         setTagsStr(t.tags?.join(', ') || '')
+        setAssignedTo(t.assigned_to ?? null)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
@@ -61,6 +65,7 @@ export function TaskForm() {
       priority: priority || 'medium',
       due_date: dueDate ? new Date(dueDate).toISOString() : null,
       tags: tagsStr ? tagsStr.split(',').map((s) => s.trim()).filter(Boolean) : null,
+      assigned_to: assignedTo ?? undefined,
     }
 
     setSaving(true)
@@ -143,6 +148,22 @@ export function TaskForm() {
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                 />
+              </div>
+              <div className="form-group">
+                <label htmlFor="task-assign">Assign to</label>
+                <select
+                  id="task-assign"
+                  className="form-select"
+                  value={assignedTo ?? ''}
+                  onChange={(e) => setAssignedTo(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Unassigned</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.email}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="form-group">

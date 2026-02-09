@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { FileUpload } from '../components/FileUpload'
 import { commentsAPI, filesAPI, tasksAPI } from '../api'
+import { useUsers } from '../context/UsersContext'
 import { getTaskStatus, formatStatusLabel, TASK_STATUS } from '../utils/taskStatus'
 import type { Task, Comment, FileRecord } from '../types'
 
@@ -16,6 +18,7 @@ import type { Task, Comment, FileRecord } from '../types'
 export function TaskDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { getUserEmail } = useUsers()
   const [task, setTask] = useState<Task | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [files, setFiles] = useState<FileRecord[]>([])
@@ -154,6 +157,9 @@ export function TaskDetail() {
               Due: {new Date(task.due_date).toLocaleString()}
             </p>
           )}
+          <p style={{ margin: '0.5rem 0 0', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+            Assigned to: <span style={{ fontWeight: 500 }}>{getUserEmail(task.assigned_to)}</span>
+          </p>
           {task.tags && task.tags.length > 0 && (
             <p style={{ marginTop: '0.5rem' }}>
               {task.tags.map((tag) => (
@@ -207,7 +213,9 @@ export function TaskDetail() {
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {comments.map((c) => (
               <li key={c.id} style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--border)' }}>
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{c.content}</p>
+                <div className="comment-markdown">
+                  <ReactMarkdown>{c.content}</ReactMarkdown>
+                </div>
                 <p style={{ margin: '0.25rem 0 0', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
                   {new Date(c.created_at).toLocaleString()}
                 </p>

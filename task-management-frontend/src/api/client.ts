@@ -25,7 +25,12 @@ export async function request<T>(
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new Error(data.detail || data.message || `Request failed: ${res.status}`)
+    const msg = typeof data.detail === 'string'
+      ? data.detail
+      : Array.isArray(data.detail)
+        ? data.detail.map((e: { msg?: string }) => e.msg).filter(Boolean).join('; ') || 'Validation error'
+        : data.message || `Request failed: ${res.status}`
+    throw new Error(msg)
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>

@@ -1,6 +1,7 @@
+import asyncio
 import json
-from typing import List, Optional
 import logging
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, BackgroundTasks
 from sqlalchemy.orm import Session
@@ -10,10 +11,21 @@ from app.models.task import Task
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate, BulkTaskCreate, BulkTaskResponse, _normalize_status as normalize_status
 from app.services import task_service
+from app.services.background_jobs import send_task_assigned_email, send_task_completed_email
 from app.services.websocket_manager import manager
 from app.utils.auth import get_current_user
 
 logger = logging.getLogger(__name__)
+
+
+def run_async(coro):
+    """Safely run an async coroutine from a sync context (e.g. FastAPI background task)."""
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(coro)
+    except RuntimeError:
+        asyncio.run(coro)
+
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["Tasks"], redirect_slashes=False)
 
@@ -59,6 +71,7 @@ def create_task(
     """Create a new task for the authenticated user. Returns 201 on success."""
     from datetime import datetime
 
+    assigned_user = None
     if task.assigned_to is not None:
         assigned_user = db.query(User).filter(User.id == task.assigned_to).first()
         if not assigned_user:
@@ -85,13 +98,23 @@ def create_task(
     db.commit()
     db.refresh(new_task)
 
+    logger.info("Task %s assigned_to=%s", new_task.id, new_task.assigned_to)
+
     background_tasks.add_task(
-        manager.broadcast,
-        {
+        run_async,
+        manager.broadcast({
             "type": "TASK_CREATED",
             "payload": TaskResponse.model_validate(new_task).model_dump(mode="json")
-        }
+        })
     )
+    if assigned_user:
+        background_tasks.add_task(
+            send_task_assigned_email,
+            assigned_user.email,
+            new_task.title,
+        )
+    elif new_task.assigned_to:
+        logger.warning("Assigned user not found for task %s assigned_to=%s", new_task.id, new_task.assigned_to)
 
     return new_task
 
@@ -191,6 +214,7 @@ def update_task(
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
+    old_assigned_to = task.assigned_to
     updated = False
 
     # Handle status update - status is the single source of truth
@@ -260,26 +284,26 @@ def update_task(
     if updated:
         db.commit()
         db.refresh(task)
-        
+        if "assigned_to" in task_update.model_fields_set:
+            logger.info(
+                "Task %s reassigned from %s to %s",
+                task.id,
+                old_assigned_to,
+                task.assigned_to,
+            )
         background_tasks.add_task(
-            manager.broadcast,
-            {
+            run_async,
+            manager.broadcast({
                 "type": "TASK_UPDATED",
                 "payload": TaskResponse.model_validate(task).model_dump(mode="json")
-            }
+            })
         )
-        
-        # Send email if task is completed (optional: requires Celery/worker)
         if task.completed and task.completed_at:
-            try:
-                from app.worker import send_email_task
-                send_email_task.delay(
-                    email_to=current_user.email,
-                    subject=f"Task Completed: {task.title}",
-                    body=f"<h1>Task Completed</h1><p>You have completed the task: <strong>{task.title}</strong></p>"
-                )
-            except ImportError:
-                pass
+            background_tasks.add_task(
+                send_task_completed_email,
+                current_user.email,
+                task.title,
+            )
 
     return task
 
@@ -307,11 +331,11 @@ def delete_task(
     db.commit()
 
     background_tasks.add_task(
-        manager.broadcast,
-        {
+        run_async,
+        manager.broadcast({
             "type": "TASK_DELETED",
             "payload": {"id": task_id}
-        }
+        })
     )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

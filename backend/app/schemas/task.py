@@ -4,6 +4,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.utils.sanitize import sanitize_text
+
 
 ALLOWED_PRIORITIES = {"low", "medium", "high"}
 ALLOWED_STATUSES = {"todo", "in_progress", "done"}
@@ -64,6 +66,19 @@ class TaskCreate(BaseModel):
         if isinstance(v, list):
             return _normalize_tags(v)
         raise ValueError("tags must be a list of strings")
+
+    @field_validator("title", mode="after")
+    @classmethod
+    def sanitize_title(cls, v):
+        s = sanitize_text(v, max_length=500) if v else ""
+        if not s:
+            raise ValueError("title is required and cannot be empty after sanitization")
+        return s
+
+    @field_validator("description", mode="after")
+    @classmethod
+    def sanitize_description(cls, v):
+        return sanitize_text(v, max_length=20_000) if v else v
 
 
 class BulkTaskCreate(BaseModel):
@@ -154,3 +169,13 @@ class TaskUpdate(BaseModel):
         if isinstance(v, list):
             return _normalize_tags(v)
         raise ValueError("tags must be a list of strings")
+
+    @field_validator("title", mode="after")
+    @classmethod
+    def sanitize_title(cls, v):
+        return sanitize_text(v, max_length=500) if v else v
+
+    @field_validator("description", mode="after")
+    @classmethod
+    def sanitize_description(cls, v):
+        return sanitize_text(v, max_length=20_000) if v else v

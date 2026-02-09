@@ -21,7 +21,7 @@ export const authAPI = {
   },
 
   async getMe(): Promise<User> {
-    return request<User>('/me')
+    return request<User>('/api/v1/auth/me')
   },
 
   logout(): void {

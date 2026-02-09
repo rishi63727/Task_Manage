@@ -1,6 +1,8 @@
-import React, { lazy, Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
+import { UsersProvider } from './context/UsersContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
 import { LoadingSpinner } from './components/LoadingSpinner'
@@ -11,6 +13,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default:
 const TaskList = lazy(() => import('./pages/TaskList').then((m) => ({ default: m.TaskList })))
 const TaskDetail = lazy(() => import('./pages/TaskDetail').then((m) => ({ default: m.TaskDetail })))
 const TaskForm = lazy(() => import('./pages/TaskForm').then((m) => ({ default: m.TaskForm })))
+const BulkCreateTasks = lazy(() => import('./pages/BulkCreateTasks').then((m) => ({ default: m.BulkCreateTasks })))
 const Profile = lazy(() => import('./pages/Profile').then((m) => ({ default: m.Profile })))
 const Analytics = lazy(() => import('./pages/Analytics').then((m) => ({ default: m.Analytics })))
 
@@ -26,6 +29,7 @@ function AppRoutes() {
   }
 
   return (
+    <UsersProvider>
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
@@ -55,6 +59,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <Suspense fallback={<Layout><LoadingSpinner /></Layout>}>
               <TaskForm />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tasks/bulk"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={<Layout><LoadingSpinner /></Layout>}>
+              <BulkCreateTasks />
             </Suspense>
           </ProtectedRoute>
         }
@@ -102,15 +116,18 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </UsersProvider>
   )
 }
 
 export default function App() {
   return (
-    <BrowserRouter future={{ v7_relativeSplatPath: true }}>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+    <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

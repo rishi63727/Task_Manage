@@ -1,4 +1,6 @@
-:root {
+/* Dark theme (default) */
+:root,
+[data-theme="dark"] {
   --bg: #0f0f12;
   --bg-elevated: #18181c;
   --bg-hover: #222228;
@@ -13,6 +15,22 @@
   --radius: 8px;
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg: #f4f4f5;
+  --bg-elevated: #ffffff;
+  --bg-hover: #e4e4e7;
+  --border: #d4d4d8;
+  --text: #18181b;
+  --text-muted: #71717a;
+  --accent: #6d28d9;
+  --accent-hover: #5b21b6;
+  --success: #16a34a;
+  --warning: #ca8a04;
+  --error: #dc2626;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 *,
@@ -338,3 +356,12 @@ textarea::placeholder {
 .badge-low { background: #3b82f6; color: #fff; }
 .badge-medium { background: var(--accent); color: #fff; }
 .badge-high { background: var(--error); color: #fff; }
+
+/* Comment markdown */
+.comment-markdown { margin: 0; }
+.comment-markdown p { margin: 0 0 0.5rem; }
+.comment-markdown p:last-child { margin-bottom: 0; }
+.comment-markdown code { background: var(--bg-hover); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+.comment-markdown pre { margin: 0.5rem 0; overflow: auto; }
+.comment-markdown pre code { padding: 0.5rem; display: block; }
+.comment-markdown a { color: var(--accent); }

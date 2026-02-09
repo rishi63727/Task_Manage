@@ -1,12 +1,11 @@
-import os
-from typing import List
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
-from pydantic import EmailStr, BaseModel
 import logging
+import os
+
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 
 logger = logging.getLogger(__name__)
 
-# Basic configuration - strictly relies on env vars
+# Basic configuration - strictly relies on env vars (MAIL_* in .env)
 # In a real app, use a proper Config class
 conf = ConnectionConfig(
     MAIL_USERNAME=os.getenv("MAIL_USERNAME", "user@example.com"),

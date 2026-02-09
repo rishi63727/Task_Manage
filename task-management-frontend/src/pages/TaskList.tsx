@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { EmptyState } from '../components/EmptyState'
 import { tasksAPI } from '../api'
+import { useUsers } from '../context/UsersContext'
+import { connectSocket, disconnectSocket } from '../services/socket'
 import { getTaskStatus, formatStatusLabel, TASK_STATUS } from '../utils/taskStatus'
 import type { Task } from '../types'
 
@@ -11,6 +13,9 @@ const STATUS_OPTIONS = ['', TASK_STATUS.TODO, TASK_STATUS.IN_PROGRESS, TASK_STAT
 const PRIORITY_OPTIONS = ['', 'low', 'medium', 'high']
 
 export function TaskList() {
+  const { getUserEmail } = useUsers()
+  const location = useLocation()
+  const bulkCreated = (location.state as { bulkCreated?: number } | null)?.bulkCreated
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +48,19 @@ export function TaskList() {
     return () => clearTimeout(t)
   }, [fetchTasks])
 
+  useEffect(() => {
+    connectSocket((event) => {
+      switch (event.type) {
+        case 'TASK_CREATED':
+        case 'TASK_UPDATED':
+        case 'TASK_DELETED':
+          fetchTasks()
+          break
+      }
+    })
+    return () => disconnectSocket()
+  }, [fetchTasks])
+
   const statusBadge = (task: Task) => {
     const s = getTaskStatus(task)
     return (
@@ -62,9 +80,14 @@ export function TaskList() {
     <Layout>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
         <h2 style={{ margin: 0 }}>Tasks</h2>
-        <Link to="/tasks/new" className="btn btn-primary">
-          New task
-        </Link>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <Link to="/tasks/new" className="btn btn-primary">
+            New task
+          </Link>
+          <Link to="/tasks/bulk" className="btn btn-secondary">
+            Bulk create
+          </Link>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
@@ -120,6 +143,11 @@ export function TaskList() {
         </div>
       </div>
 
+      {bulkCreated != null && (
+        <p style={{ padding: '0.75rem 1rem', background: 'var(--success)', color: '#000', borderRadius: 'var(--radius)', marginBottom: '1rem' }}>
+          Created {bulkCreated} task{bulkCreated !== 1 ? 's' : ''} successfully.
+        </p>
+      )}
       {error && <p className="form-error">{error}</p>}
       {loading && <LoadingSpinner />}
       {!loading && !error && tasks.length === 0 && (
@@ -159,6 +187,9 @@ export function TaskList() {
                             Due {new Date(task.due_date).toLocaleDateString()}
                           </span>
                         )}
+                        <p style={{ margin: '0.25rem 0 0', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                          Assigned to: <span style={{ fontWeight: 500 }}>{getUserEmail(task.assigned_to)}</span>
+                        </p>
                       </div>
                     </div>
                     <span className={`badge badge-${getTaskStatus(task) === TASK_STATUS.DONE ? 'done' : getTaskStatus(task) === TASK_STATUS.IN_PROGRESS ? 'in_progress' : 'todo'}`}>

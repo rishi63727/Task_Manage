@@ -1,17 +1,30 @@
+import uuid
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 from app.services.websocket_manager import manager
 
 router = APIRouter(tags=["websockets"])
 
-@router.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
+
+@router.websocket("/ws")
+async def websocket_plain(websocket: WebSocket):
+    """WebSocket at /ws (no client_id). Server assigns an id. Use this for simple frontend clients."""
+    client_id = str(uuid.uuid4())
     await manager.connect(websocket, client_id)
     try:
         while True:
-            # Keep the connection alive and listen for messages if needed
-            # For now, we mainly use this for server-to-client push
-            data = await websocket.receive_text()
-            # Optionally handle client messages
-            # await manager.send_personal_message(f"You wrote: {data}", client_id)
+            await websocket.receive_text()  # keep-alive
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, client_id)
+
+
+@router.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    """WebSocket at /ws/{client_id} for clients that want to supply their own id (e.g. multi-tab)."""
+    await manager.connect(websocket, client_id)
+    try:
+        while True:
+            await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket, client_id)
