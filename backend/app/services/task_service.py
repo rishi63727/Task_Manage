@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.task import Task
 from app.models.user import User
-from app.schemas.task import TaskCreate, BulkTaskCreate
+from app.schemas.task import TaskCreate, BulkTaskCreate, _normalize_status as normalize_status
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ def create_bulk_tasks(
                 assigned_user = db.query(User).filter(User.id == task_data.assigned_to).first()
                 if not assigned_user:
                     raise ValueError("Assigned user not found")
-            status_value = task_data.status or "todo"
+            status_value = normalize_status(task_data.status or "todo")
             completed_value = status_value == "done"
             completed_at = datetime.utcnow() if completed_value else None
             tags_json = json.dumps(task_data.tags) if task_data.tags is not None else None

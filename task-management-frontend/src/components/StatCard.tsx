@@ -1,33 +1,18 @@
-import styles from './StatCard.module.css'
+import React from 'react';
+import { formatNumber } from '../utils/format';
 
 interface StatCardProps {
-  label: string
-  value: string
-  color: 'blue' | 'orange' | 'green' | 'red'
+  label: string;
+  value: number | string;
+  helper?: string;
 }
 
-function StatCard({ label, value, color }: StatCardProps) {
-  const colorMap = {
-    blue: '#3b82f6',
-    orange: '#f59e0b',
-    green: '#10b981',
-    red: '#ef4444',
-  }
+const StatCard: React.FC<StatCardProps> = ({ label, value, helper }) => (
+  <div className="card stat-card">
+    <p className="stat-label">{label}</p>
+    <h2 className="stat-value">{typeof value === 'number' ? formatNumber(value) : value}</h2>
+    {helper && <p className="stat-helper">{helper}</p>}
+  </div>
+);
 
-  return (
-    <div className={styles.card}>
-      <div className={styles.icon} style={{ backgroundColor: colorMap[color] }}>
-        {color === 'blue' && '📊'}
-        {color === 'orange' && '⚡'}
-        {color === 'green' && '✓'}
-        {color === 'red' && '⚠️'}
-      </div>
-      <div className={styles.content}>
-        <p className={styles.label}>{label}</p>
-        <p className={styles.value}>{value}</p>
-      </div>
-    </div>
-  )
-}
-
-export default StatCard
+export default StatCard;

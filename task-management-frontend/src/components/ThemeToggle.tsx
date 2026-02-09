@@ -1,18 +1,22 @@
-import { useTheme } from '../hooks/useTheme';
-import styles from './ThemeToggle.module.css';
+import React, { useEffect, useState } from 'react';
 
-const ThemeToggle = () => {
-    const { theme, toggleTheme } = useTheme();
+type Theme = 'light' | 'dark';
 
-    return (
-        <button
-            onClick={toggleTheme}
-            className={styles.toggle}
-            aria-label="Toggle Dark Mode"
-        >
-            {theme === 'light' ? '🌙' : '☀️'}
-        </button>
-    );
+const getStoredTheme = (): Theme => (localStorage.getItem('theme') as Theme) || 'light';
+
+const ThemeToggle: React.FC = () => {
+  const [theme, setTheme] = useState<Theme>(getStoredTheme());
+
+  useEffect(() => {
+    document.body.dataset.theme = theme;
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  return (
+    <button className="btn btn-ghost" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+      {theme === 'light' ? 'Dark mode' : 'Light mode'}
+    </button>
+  );
 };
 
 export default ThemeToggle;

@@ -1,47 +1,43 @@
 import React from 'react';
-import styles from './ConfirmDialog.module.css';
 
 interface ConfirmDialogProps {
-  open: boolean;
   title: string;
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  variant?: 'danger' | 'default';
+  isOpen: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  tone?: 'danger' | 'primary';
 }
 
-export default function ConfirmDialog({
-  open,
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   title,
   message,
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
-  variant = 'default',
+  isOpen,
   onConfirm,
   onCancel,
-}: ConfirmDialogProps) {
-  if (!open) return null;
-
+  tone = 'primary',
+}) => {
+  if (!isOpen) return null;
   return (
-    <div className={styles.overlay} onClick={onCancel}>
-      <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
-        <h3 className={styles.title}>{title}</h3>
-        <p className={styles.message}>{message}</p>
-        <div className={styles.actions}>
-          <button type="button" className={styles.cancelButton} onClick={onCancel}>
+    <div className="dialog-backdrop">
+      <div className="dialog">
+        <h3>{title}</h3>
+        <p>{message}</p>
+        <div className="dialog-actions">
+          <button className="btn btn-ghost" onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button
-            type="button"
-            className={variant === 'danger' ? styles.dangerButton : styles.confirmButton}
-            onClick={onConfirm}
-          >
+          <button className={`btn ${tone === 'danger' ? 'btn-danger' : 'btn-primary'}`} onClick={onConfirm}>
             {confirmLabel}
           </button>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default ConfirmDialog;

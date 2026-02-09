@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -9,6 +9,7 @@ class TaskSummary(BaseModel):
     total: int
     completed: int
     pending: int
+    overdue: int
     by_priority: dict  # {"low": count, "medium": count, "high": count}
     by_status: dict = {}  # {"todo": count, "in_progress": count, "done": count}
 
@@ -24,8 +25,8 @@ class UserPerformance(BaseModel):
 
 
 class DailyTrend(BaseModel):
-    """Daily trend data."""
-    date: datetime
+    """Daily trend data (one per day; date as YYYY-MM-DD)."""
+    date: date
     tasks_created: int
     tasks_completed: int
 

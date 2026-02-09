@@ -8,14 +8,14 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.task import Task
 from app.models.user import User
-from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate, BulkTaskCreate, BulkTaskResponse
+from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate, BulkTaskCreate, BulkTaskResponse, _normalize_status as normalize_status
 from app.services import task_service
 from app.services.websocket_manager import manager
 from app.utils.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/tasks", tags=["Tasks"])
+router = APIRouter(prefix="/api/v1/tasks", tags=["Tasks"], redirect_slashes=False)
 
 
 @router.post(
@@ -64,7 +64,7 @@ def create_task(
         if not assigned_user:
             raise HTTPException(status_code=400, detail="Assigned user not found")
 
-    status_value = task.status or "todo"
+    status_value = normalize_status(task.status or "todo")
     completed_value = status_value == "done"
     completed_at = datetime.utcnow() if completed_value else None
     tags_json = json.dumps(task.tags) if task.tags is not None else None
@@ -105,9 +105,6 @@ def list_tasks(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     q: Optional[str] = Query(None, description="Search in title and description"),
-    completed: Optional[bool] = Query(
-        None, description="Filter by completion status"
-    ),
     priority: Optional[str] = Query(
         None, description="Filter by priority (low, medium, high)"
     ),
@@ -124,18 +121,20 @@ def list_tasks(
     sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
 ):
     """Retrieve tasks for the authenticated user with optional filtering, search, sorting and pagination."""
+    logger.info("GET /tasks params: status=%r priority=%r", status, priority)
+
     query = db.query(Task).filter(Task.owner_id == current_user.id, Task.is_deleted == False)
 
     if q and q.strip():
         from sqlalchemy import or_
         term = f"%{q.strip()}%"
         query = query.filter(or_(Task.title.ilike(term), Task.description.ilike(term)))
-    if completed is not None:
-        query = query.filter(Task.completed == completed)
-    if priority:
-        query = query.filter(Task.priority == priority)
-    if status:
-        query = query.filter(Task.status == status)
+    if priority and priority.strip():
+        query = query.filter(Task.priority == priority.strip().lower())
+    if status and status.strip():
+        status_val = normalize_status(status.strip())
+        if status_val in ("todo", "in_progress", "done"):
+            query = query.filter(Task.status == status_val)
 
     sort_columns = {"created_at": Task.created_at, "updated_at": Task.updated_at, "due_date": Task.due_date, "priority": Task.priority, "title": Task.title}
     sort_col = sort_columns.get(sort_by, Task.created_at)
@@ -183,7 +182,7 @@ def update_task(
 ):
     """Update a task owned by current user. Returns 404 if not found, 403 if not authorized, 200 on success."""
     from datetime import datetime
-    
+
     task = (
         db.query(Task)
         .filter(Task.id == task_id, Task.owner_id == current_user.id, Task.is_deleted == False)
@@ -193,6 +192,32 @@ def update_task(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
     updated = False
+
+    # Handle status update - status is the single source of truth
+    if task_update.status is not None:
+        new_status = normalize_status(task_update.status)
+
+        if task.status != new_status:
+            task.status = new_status
+            updated = True
+
+        # Derive completed from status
+        if task.status == "done":
+            if not task.completed:
+                task.completed = True
+                updated = True
+            if not task.completed_at:
+                task.completed_at = datetime.utcnow()
+                updated = True
+        else:
+            if task.completed:
+                task.completed = False
+                updated = True
+            if task.completed_at is not None:
+                task.completed_at = None
+                updated = True
+    
+    # Handle other fields
     if task_update.title is not None:
         task.title = task_update.title
         updated = True
@@ -201,16 +226,6 @@ def update_task(
         updated = True
     if task_update.priority is not None:
         task.priority = task_update.priority
-        updated = True
-    if task_update.status is not None:
-        task.status = task_update.status
-        if task_update.status == "done":
-            task.completed = True
-            if not task.completed_at:
-                task.completed_at = datetime.utcnow()
-        else:
-            task.completed = False
-            task.completed_at = None
         updated = True
     if "due_date" in task_update.model_fields_set:
         task.due_date = task_update.due_date
@@ -224,17 +239,6 @@ def update_task(
             if not assigned_user:
                 raise HTTPException(status_code=400, detail="Assigned user not found")
         task.assigned_to = task_update.assigned_to
-        updated = True
-    if task_update.completed is not None:
-        task.completed = task_update.completed
-        if task_update.completed:
-            task.status = "done"
-            if not task.completed_at:
-                task.completed_at = datetime.utcnow()
-        else:
-            if task.status == "done":
-                task.status = "todo"
-            task.completed_at = None
         updated = True
 
     if updated:
@@ -250,7 +254,7 @@ def update_task(
         )
         
         # Send email if task is completed (optional: requires Celery/worker)
-        if task_update.completed and task.completed:
+        if task.completed and task.completed_at:
             try:
                 from app.worker import send_email_task
                 send_email_task.delay(
@@ -283,8 +287,6 @@ def delete_task(
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
-    # Soft delete: mark the task as deleted instead of removing the row.
-    # Soft delete: mark the task as deleted instead of removing the row.
     task.is_deleted = True
     db.commit()
 

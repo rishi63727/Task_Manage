@@ -43,5 +43,5 @@ websockets==12.0
 celery==5.3.6
 redis==5.0.1
 fastapi-mail==1.4.1
-fastapi-cache2-redis==0.2.1
 asyncio-redis==0.16.0
+fastapi-cache2==0.2.1

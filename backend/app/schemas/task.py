@@ -73,7 +73,9 @@ class BulkTaskCreate(BaseModel):
 
 class TaskResponse(BaseModel):
     """Schema for task response in API replies."""
-    model_config = ConfigDict(from_attributes=True)
+    model_config = {
+        "from_attributes": True
+    }
 
     id: int
     title: str
@@ -116,7 +118,6 @@ class TaskUpdate(BaseModel):
     """Schema for updating an existing task. All fields are optional."""
     title: Optional[str] = None
     description: Optional[str] = None
-    completed: Optional[bool] = None
     priority: Optional[str] = None
     status: Optional[str] = None
     due_date: Optional[datetime] = None

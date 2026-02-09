@@ -1,14 +1,22 @@
 """Analytics service for reporting."""
 import logging
-from datetime import datetime, timedelta
+from collections import defaultdict
+from datetime import date, datetime, timedelta
 from typing import List
 
-from sqlalchemy import func, text
+from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import Session
 
 from app.models.task import Task
 from app.models.user import User
 from app.schemas.analytics import TaskSummary, UserPerformance, DailyTrend
+
+
+def generate_date_range(start: date, end: date):
+    current = start
+    while current <= end:
+        yield current
+        current += timedelta(days=1)
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +28,25 @@ def get_task_summary(db: Session, user_id: int) -> TaskSummary:
         Task.owner_id == user_id,
         Task.is_deleted == False
     ).scalar() or 0
-    
+
     # Completed tasks
     completed = db.query(func.count(Task.id)).filter(
         Task.owner_id == user_id,
         Task.is_deleted == False,
-        Task.completed == True
+        Task.status == "done"
     ).scalar() or 0
-    
+
     # Pending tasks
     pending = total - completed
+
+    # Overdue tasks (not done and past due date)
+    overdue = db.query(func.count(Task.id)).filter(
+        Task.owner_id == user_id,
+        Task.is_deleted == False,
+        Task.status != "done",
+        Task.due_date != None,
+        Task.due_date < datetime.utcnow()
+    ).scalar() or 0
     
     # By priority (string: "low" | "medium" | "high")
     priority_counts = db.query(
@@ -60,6 +77,7 @@ def get_task_summary(db: Session, user_id: int) -> TaskSummary:
         total=total,
         completed=completed,
         pending=pending,
+        overdue=overdue,
         by_priority=by_priority,
         by_status=by_status
     )
@@ -81,7 +99,7 @@ def get_user_performance(db: Session) -> List[UserPerformance]:
         completed = db.query(func.count(Task.id)).filter(
             Task.owner_id == user.id,
             Task.is_deleted == False,
-            Task.completed == True
+            Task.status == "done"
         ).scalar() or 0
         
         # Completion rate
@@ -91,7 +109,7 @@ def get_user_performance(db: Session) -> List[UserPerformance]:
         completed_tasks = db.query(Task.completed_at, Task.created_at).filter(
             Task.owner_id == user.id,
             Task.is_deleted == False,
-            Task.completed == True,
+            Task.status == "done",
             Task.completed_at != None
         ).all()
         
@@ -118,38 +136,52 @@ def get_user_performance(db: Session) -> List[UserPerformance]:
 
 
 def get_task_trends(db: Session, days: int = 30) -> List[DailyTrend]:
-    """Get daily task creation and completion trends."""
-    start_date = datetime.utcnow() - timedelta(days=days)
-    
-    # Raw query for aggregation
-    created_query = db.query(
-        func.date(Task.created_at).label('date'),
-        func.count(Task.id).label('count')
-    ).filter(
+    """Get daily task creation and completion trends (one entry per day, zeros included)."""
+    # Use UTC so range is consistent regardless of server timezone
+    end_date = datetime.utcnow().date()
+    start_date = end_date - timedelta(days=days - 1)  # Include today
+
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    end_dt = datetime.combine(end_date, datetime.min.time())
+
+    # Fetch tasks that were either created in range OR completed in range
+    # (so we count completions for tasks created before the range)
+    tasks = db.query(Task).filter(
         Task.is_deleted == False,
-        Task.created_at >= start_date
-    ).group_by(func.date(Task.created_at)).all()
-    
-    completed_query = db.query(
-        func.date(Task.completed_at).label('date'),
-        func.count(Task.id).label('count')
-    ).filter(
-        Task.is_deleted == False,
-        Task.completed == True,
-        Task.completed_at != None,
-        Task.completed_at >= start_date
-    ).group_by(func.date(Task.completed_at)).all()
-    
-    # Build dict for merging
-    trends_dict = {}
-    for date, count in created_query:
-        if date not in trends_dict:
-            trends_dict[date] = DailyTrend(date=date, tasks_created=0, tasks_completed=0)
-        trends_dict[date].tasks_created = count
-    
-    for date, count in completed_query:
-        if date not in trends_dict:
-            trends_dict[date] = DailyTrend(date=date, tasks_created=0, tasks_completed=0)
-        trends_dict[date].tasks_completed = count
-    
-    return sorted(trends_dict.values(), key=lambda x: x.date)
+        or_(
+            and_(
+                Task.created_at >= start_dt,
+                Task.created_at < end_dt + timedelta(days=1),
+            ),
+            and_(
+                Task.completed_at.isnot(None),
+                Task.completed_at >= start_dt,
+                Task.completed_at < end_dt + timedelta(days=1),
+            ),
+        ),
+    ).all()
+
+    # Aggregate by date (use .date() for timezone-naive UTC dates)
+    created_map = defaultdict(int)
+    completed_map = defaultdict(int)
+
+    for task in tasks:
+        created_day = task.created_at.date()
+        if start_date <= created_day <= end_date:
+            created_map[created_day] += 1
+        if task.completed_at:
+            completed_day = task.completed_at.date()
+            if start_date <= completed_day <= end_date:
+                completed_map[completed_day] += 1
+
+    # Build continuous series: one entry per day, including zeros
+    trends = []
+    for day in generate_date_range(start_date, end_date):
+        trends.append(
+            DailyTrend(
+                date=day,
+                tasks_created=created_map.get(day, 0),
+                tasks_completed=completed_map.get(day, 0),
+            )
+        )
+    return trends
