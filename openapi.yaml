@@ -1,0 +1,741 @@
+openapi: "3.1.0"
+info:
+  title: Task Management API
+  version: 0.1.0
+
+paths:
+  /api/v1/tasks/export:
+    get:
+      tags: [Export]
+      summary: Export Tasks
+      description: Export user's tasks as CSV or JSON.
+      operationId: export_tasks_api_v1_tasks_export_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: format
+          in: query
+          required: false
+          schema: { anyOf: [{ type: string }, { type: "null" }], title: Format }
+        - name: completed
+          in: query
+          required: false
+          schema: { anyOf: [{ type: boolean }, { type: "null" }], title: Completed }
+        - name: priority
+          in: query
+          required: false
+          schema: { anyOf: [{ type: string }, { type: "null" }], title: Priority }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, maximum: 10000, minimum: 1, default: 1000, title: Limit }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0, title: Offset }
+      responses:
+        "200": { description: Successful Response, content: { application/json: { schema: {} } } }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/tasks/bulk:
+    post:
+      tags: [Tasks]
+      summary: Create Bulk Tasks
+      description: Create multiple tasks in a single transaction. Validates all input before creating.
+      operationId: create_bulk_tasks_api_v1_tasks_bulk_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkTaskCreate" }
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkTaskResponse" }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+      security: [{ OAuth2PasswordBearer: [] }]
+
+  /api/v1/tasks/:
+    post:
+      tags: [Tasks]
+      summary: Create Task
+      description: Create a new task for the authenticated user. Returns 201 on success.
+      operationId: create_task_api_v1_tasks__post
+      security: [{ OAuth2PasswordBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskCreate" }
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+    get:
+      tags: [Tasks]
+      summary: List Tasks
+      description: Retrieve tasks for the authenticated user with optional filtering, search, sorting and pagination.
+      operationId: list_tasks_api_v1_tasks__get
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search in title and description
+          schema: { anyOf: [{ type: string }, { type: "null" }], title: Q }
+        - name: priority
+          in: query
+          required: false
+          description: Filter by priority (low, medium, high)
+          schema: { anyOf: [{ type: string }, { type: "null" }], title: Priority }
+        - name: status
+          in: query
+          required: false
+          description: Filter by status (todo, in_progress, done)
+          schema: { anyOf: [{ type: string }, { type: "null" }], title: Status }
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of items to return
+          schema: { type: integer, maximum: 100, minimum: 1, default: 10, title: Limit }
+        - name: offset
+          in: query
+          required: false
+          description: Number of items to skip
+          schema: { type: integer, minimum: 0, default: 0, title: Offset }
+        - name: sort_by
+          in: query
+          required: false
+          description: Sort field (created_at, updated_at, due_date, priority, title)
+          schema: { anyOf: [{ type: string }, { type: "null" }], default: created_at, title: Sort By }
+        - name: sort_order
+          in: query
+          required: false
+          description: Sort order (asc or desc)
+          schema: { anyOf: [{ type: string }, { type: "null" }], default: desc, title: Sort Order }
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TaskResponse" }
+                title: Response List Tasks Api V1 Tasks Get
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/tasks/{task_id}:
+    get:
+      tags: [Tasks]
+      summary: Get Task
+      description: Retrieve a single task by id. Returns 404 if missing, 403 if not owned by user.
+      operationId: get_task_api_v1_tasks__task_id__get
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: integer, title: Task Id }
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+    put:
+      tags: [Tasks]
+      summary: Update Task
+      description: Update a task owned by current user. Returns 404 if not found, 403 if not authorized, 200 on success.
+      operationId: update_task_api_v1_tasks__task_id__put
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: integer, title: Task Id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskUpdate" }
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+    delete:
+      tags: [Tasks]
+      summary: Delete Task
+      description: Soft-delete a task owned by current user. Returns 404 if not found, 403 if not authorized, 204 on success.
+      operationId: delete_task_api_v1_tasks__task_id__delete
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: integer, title: Task Id }
+      responses:
+        "204": { description: Successful Response }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/tasks/{task_id}/comments:
+    post:
+      tags: [Comments]
+      summary: Create Comment
+      description: Create a comment on a task. Only task owner and assigned users can comment.
+      operationId: create_comment_api_v1_tasks__task_id__comments_post
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: integer, title: Task Id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommentCreate" }
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommentResponse" }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+    get:
+      tags: [Comments]
+      summary: List Comments
+      description: Get all comments on a task. Only task owner or assigned users can view.
+      operationId: list_comments_api_v1_tasks__task_id__comments_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: integer, title: Task Id }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, maximum: 100, minimum: 1, default: 50, title: Limit }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0, title: Offset }
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CommentResponse" }
+                title: Response List Comments Api V1 Tasks Task Id Comments Get
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/comments/{comment_id}:
+    put:
+      tags: [Comments]
+      summary: Update Comment
+      description: Update a comment. Only comment owner can update.
+      operationId: update_comment_api_v1_comments__comment_id__put
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: comment_id
+          in: path
+          required: true
+          schema: { type: integer, title: Comment Id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommentUpdate" }
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommentResponse" }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+    delete:
+      tags: [Comments]
+      summary: Delete Comment
+      description: Delete a comment. Only comment owner can delete.
+      operationId: delete_comment_api_v1_comments__comment_id__delete
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: comment_id
+          in: path
+          required: true
+          schema: { type: integer, title: Comment Id }
+      responses:
+        "204": { description: Successful Response }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/tasks/{task_id}/files:
+    post:
+      tags: [Files]
+      summary: Upload File
+      description: Upload a file to a task.
+      operationId: upload_file_api_v1_tasks__task_id__files_post
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: integer, title: Task Id }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/Body_upload_file_api_v1_tasks__task_id__files_post" }
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FileResponse" }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+    get:
+      tags: [Files]
+      summary: List Task Files
+      description: List all files for a task.
+      operationId: list_task_files_api_v1_tasks__task_id__files_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: integer, title: Task Id }
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/FileResponse" }
+                title: Response List Task Files Api V1 Tasks Task Id Files Get
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/tasks/files/{file_id}:
+    get:
+      tags: [Files]
+      summary: Download File (Task Scope)
+      description: Download a file (under /api/v1/tasks/files/{file_id}).
+      operationId: download_file_task_scope_api_v1_tasks_files__file_id__get
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema: { type: integer, title: File Id }
+      responses:
+        "200": { description: Successful Response, content: { application/json: { schema: {} } } }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+    delete:
+      tags: [Files]
+      summary: Delete File
+      description: Delete a file. Only uploader or task owner can delete.
+      operationId: delete_file_api_v1_tasks_files__file_id__delete
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema: { type: integer, title: File Id }
+      responses:
+        "204": { description: Successful Response }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/files/{file_id}:
+    get:
+      tags: [Files]
+      summary: Get File By Id
+      description: Get/download a file by id (GET /api/v1/files/{file_id}).
+      operationId: get_file_by_id_api_v1_files__file_id__get
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema: { type: integer, title: File Id }
+      responses:
+        "200": { description: Successful Response, content: { application/json: { schema: {} } } }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+    delete:
+      tags: [Files]
+      summary: Delete File By Id
+      description: Delete a file by id (DELETE /api/v1/files/{file_id}). Only uploader or task owner can delete.
+      operationId: delete_file_by_id_api_v1_files__file_id__delete
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema: { type: integer, title: File Id }
+      responses:
+        "204": { description: Successful Response }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/analytics/tasks/summary:
+    get:
+      tags: [Analytics]
+      summary: Get Task Summary
+      description: Get task summary for current user (count by status and priority).
+      operationId: get_task_summary_api_v1_analytics_tasks_summary_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskSummary" }
+
+  /api/v1/analytics/summary:
+    get:
+      tags: [Analytics]
+      summary: Get Task Summary (Alias)
+      description: Compatibility alias for task summary endpoint.
+      operationId: get_task_summary_alias_api_v1_analytics_summary_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskSummary" }
+
+  /api/v1/analytics/users/performance:
+    get:
+      tags: [Analytics]
+      summary: Get User Performance
+      description: Get performance metrics for all users (tasks assigned, completed, completion rate, avg time).
+      operationId: get_user_performance_api_v1_analytics_users_performance_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UserPerformance" }
+                title: Response Get User Performance Api V1 Analytics Users Performance Get
+
+  /api/v1/analytics/tasks/trends:
+    get:
+      tags: [Analytics]
+      summary: Get Task Trends
+      description: Get daily task creation and completion trends.
+      operationId: get_task_trends_api_v1_analytics_tasks_trends_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      parameters:
+        - name: days
+          in: query
+          required: false
+          schema: { type: integer, default: 30, title: Days }
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskTrends" }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register User
+      description: Register a new user account. Returns 201 on success, 400 if user already exists or password too short.
+      operationId: register_user_api_v1_auth_register_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreate" }
+      responses:
+        "201": { description: Successful Response, content: { application/json: { schema: {} } } }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Authenticate user and return JWT access token. Returns 200 on success, 401 on failure.
+      operationId: login_api_v1_auth_login_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserLogin" }
+      responses:
+        "200": { description: Successful Response, content: { application/json: { schema: {} } } }
+        "422": { description: Validation Error, content: { application/json: { schema: { $ref: "#/components/schemas/HTTPValidationError" } } } }
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get Current User Info
+      description: Get current authenticated user information. Returns 401 if not authenticated.
+      operationId: get_current_user_info_api_v1_auth_me_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      responses:
+        "200": { description: Successful Response, content: { application/json: { schema: {} } } }
+
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: List Users
+      description: Return all users (id, email) for assignee dropdown. Authenticated only.
+      operationId: list_users_api_v1_users_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object }
+                title: Response List Users Api V1 Users Get
+
+  /:
+    get:
+      summary: Root
+      description: Health check endpoint. Returns server status.
+      operationId: root__get
+      responses:
+        "200": { description: Successful Response, content: { application/json: { schema: {} } } }
+
+  /me:
+    get:
+      summary: Read Current User
+      description: Get the current authenticated user's profile.
+      operationId: read_current_user_me_get
+      security: [{ OAuth2PasswordBearer: [] }]
+      responses:
+        "200": { description: Successful Response, content: { application/json: { schema: {} } } }
+
+components:
+  schemas:
+    Body_upload_file_api_v1_tasks__task_id__files_post:
+      type: object
+      required: [file]
+      properties:
+        file: { type: string, format: binary, title: File }
+      title: Body_upload_file_api_v1_tasks__task_id__files_post
+
+    BulkTaskCreate:
+      type: object
+      required: [tasks]
+      description: Schema for bulk task creation.
+      properties:
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/TaskCreate" }
+          title: Tasks
+      title: BulkTaskCreate
+
+    BulkTaskResponse:
+      type: object
+      required: [created, tasks]
+      description: Schema for bulk task creation response.
+      properties:
+        created: { type: integer, title: Created }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/TaskResponse" }
+          title: Tasks
+      title: BulkTaskResponse
+
+    CommentCreate:
+      type: object
+      required: [content]
+      description: Schema for creating a comment.
+      properties:
+        content: { type: string, title: Content }
+      title: CommentCreate
+
+    CommentResponse:
+      type: object
+      required: [id, content, task_id, user_id, created_at, updated_at]
+      description: Schema for comment response.
+      properties:
+        id: { type: integer, title: Id }
+        content: { type: string, title: Content }
+        task_id: { type: integer, title: Task Id }
+        user_id: { type: integer, title: User Id }
+        created_at: { type: string, format: date-time, title: Created At }
+        updated_at: { type: string, format: date-time, title: Updated At }
+      title: CommentResponse
+
+    CommentUpdate:
+      type: object
+      required: [content]
+      description: Schema for updating a comment.
+      properties:
+        content: { type: string, title: Content }
+      title: CommentUpdate
+
+    DailyTrend:
+      type: object
+      required: [date, tasks_created, tasks_completed]
+      description: Daily trend data (one per day; date as YYYY-MM-DD).
+      properties:
+        date: { type: string, format: date, title: Date }
+        tasks_created: { type: integer, title: Tasks Created }
+        tasks_completed: { type: integer, title: Tasks Completed }
+      title: DailyTrend
+
+    FileResponse:
+      type: object
+      required: [id, filename, filepath, size, content_type, task_id, uploaded_by, created_at]
+      description: Schema for file response.
+      properties:
+        id: { type: integer, title: Id }
+        filename: { type: string, title: Filename }
+        filepath: { type: string, title: Filepath }
+        size: { type: integer, title: Size }
+        content_type: { type: string, title: Content Type }
+        task_id: { type: integer, title: Task Id }
+        uploaded_by: { type: integer, title: Uploaded By }
+        created_at: { type: string, format: date-time, title: Created At }
+      title: FileResponse
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items: { $ref: "#/components/schemas/ValidationError" }
+          title: Detail
+      title: HTTPValidationError
+
+    TaskCreate:
+      type: object
+      required: [title]
+      description: Schema for creating a new task.
+      properties:
+        title: { type: string, title: Title }
+        description: { anyOf: [{ type: string }, { type: "null" }], title: Description }
+        priority: { anyOf: [{ type: string }, { type: "null" }], title: Priority, default: medium }
+        status: { anyOf: [{ type: string }, { type: "null" }], title: Status, default: todo }
+        due_date: { anyOf: [{ type: string, format: date-time }, { type: "null" }], title: Due Date }
+        tags: { anyOf: [{ type: array, items: { type: string } }, { type: "null" }], title: Tags }
+        assigned_to: { anyOf: [{ type: integer }, { type: "null" }], title: Assigned To }
+      title: TaskCreate
+
+    TaskResponse:
+      type: object
+      required: [id, title, description, completed, priority, status, created_at, updated_at, owner_id]
+      description: Schema for task response in API replies.
+      properties:
+        id: { type: integer, title: Id }
+        title: { type: string, title: Title }
+        description: { anyOf: [{ type: string }, { type: "null" }], title: Description }
+        completed: { type: boolean, title: Completed }
+        priority: { type: string, title: Priority }
+        status: { type: string, title: Status }
+        due_date: { anyOf: [{ type: string, format: date-time }, { type: "null" }], title: Due Date }
+        tags: { anyOf: [{ type: array, items: { type: string } }, { type: "null" }], title: Tags }
+        created_at: { type: string, format: date-time, title: Created At }
+        updated_at: { type: string, format: date-time, title: Updated At }
+        completed_at: { anyOf: [{ type: string, format: date-time }, { type: "null" }], title: Completed At }
+        owner_id: { type: integer, title: Owner Id }
+        assigned_to: { anyOf: [{ type: integer }, { type: "null" }], title: Assigned To }
+      title: TaskResponse
+
+    TaskSummary:
+      type: object
+      required: [total, completed, pending, overdue, by_priority]
+      description: Analytics summary for tasks.
+      properties:
+        total: { type: integer, title: Total }
+        completed: { type: integer, title: Completed }
+        pending: { type: integer, title: Pending }
+        overdue: { type: integer, title: Overdue }
+        by_priority: { type: object, title: By Priority }
+        by_status: { type: object, title: By Status, default: {} }
+      title: TaskSummary
+
+    TaskTrends:
+      type: object
+      required: [daily_trends]
+      description: Trend data for tasks.
+      properties:
+        daily_trends:
+          type: array
+          items: { $ref: "#/components/schemas/DailyTrend" }
+          title: Daily Trends
+      title: TaskTrends
+
+    TaskUpdate:
+      type: object
+      description: Schema for updating an existing task. All fields are optional.
+      properties:
+        title: { anyOf: [{ type: string }, { type: "null" }], title: Title }
+        description: { anyOf: [{ type: string }, { type: "null" }], title: Description }
+        priority: { anyOf: [{ type: string }, { type: "null" }], title: Priority }
+        status: { anyOf: [{ type: string }, { type: "null" }], title: Status }
+        due_date: { anyOf: [{ type: string, format: date-time }, { type: "null" }], title: Due Date }
+        tags: { anyOf: [{ type: array, items: { type: string } }, { type: "null" }], title: Tags }
+        assigned_to: { anyOf: [{ type: integer }, { type: "null" }], title: Assigned To }
+      title: TaskUpdate
+
+    UserCreate:
+      type: object
+      required: [email, password]
+      description: Schema for user registration.
+      properties:
+        email: { type: string, format: email, title: Email }
+        password: { type: string, title: Password }
+      title: UserCreate
+
+    UserLogin:
+      type: object
+      required: [email, password]
+      description: Schema for user login.
+      properties:
+        email: { type: string, format: email, title: Email }
+        password: { type: string, title: Password }
+      title: UserLogin
+
+    UserPerformance:
+      type: object
+      required: [user_id, email, tasks_assigned, tasks_completed, completion_rate]
+      description: Performance metrics for a user.
+      properties:
+        user_id: { type: integer, title: User Id }
+        email: { type: string, title: Email }
+        tasks_assigned: { type: integer, title: Tasks Assigned }
+        tasks_completed: { type: integer, title: Tasks Completed }
+        completion_rate: { type: number, title: Completion Rate }
+        avg_completion_time_hours: { anyOf: [{ type: number }, { type: "null" }], title: Avg Completion Time Hours }
+      title: UserPerformance
+
+    ValidationError:
+      type: object
+      required: [loc, msg, type]
+      properties:
+        loc:
+          type: array
+          items: { anyOf: [{ type: string }, { type: integer }] }
+          title: Location
+        msg: { type: string, title: Message }
+        type: { type: string, title: Error Type }
+      title: ValidationError
+
+  securitySchemes:
+    OAuth2PasswordBearer:
+      type: oauth2
+      flows:
+        password:
+          tokenUrl: /api/v1/auth/login
+          scopes: {}

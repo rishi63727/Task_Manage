@@ -62,13 +62,22 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-6. Create a `.env` file with the following variables:
+6. Create a `.env` file (copy from `.env.example` and edit). Minimum:
 ```
-DATABASE_URL=sqlite:///./test.db
+DATABASE_URL=sqlite:///./app.db
 SECRET_KEY=your-secret-key-here-change-in-production
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+REDIS_URL=redis://localhost:6379/0
+# Optional: task completed/assigned emails (omit to skip sending).
+# Gmail: use an App Password (16 characters, no spaces) for MAIL_PASSWORD.
+# MAIL_HOST=smtp.gmail.com
+# MAIL_PORT=587
+# MAIL_USERNAME=your-email@gmail.com
+# MAIL_PASSWORD=yourapppassword16chars
+# MAIL_FROM=Task Manager <your-email@gmail.com>
 ```
+See project root `README.md` and `backend/.env.example` for the full list.
 
 ### Running the Server
 
@@ -79,6 +88,41 @@ python -m uvicorn app.main:app --reload
 ```
 
 The API will be available at `http://localhost:8000`
+
+### Database schema and migrations (Alembic)
+
+Schema changes are managed with **Alembic**. Run all commands from the `backend/` directory.
+
+**Fresh DB (no database file yet):** create all tables from migrations:
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+**Existing DB** that already has tables (e.g. created earlier by `create_all`): tell Alembic the DB is already at the initial revision so future migrations apply on top:
+
+```bash
+cd backend
+alembic stamp 001_initial
+```
+
+**After changing models** (new column, new table, etc.): create a migration, then apply it:
+
+```bash
+alembic revision --autogenerate -m "add status to tasks"
+alembic upgrade head
+```
+
+**Other useful commands:**
+
+- `alembic current` — show current revision
+- `alembic history` — list revisions
+- `alembic downgrade -1` — roll back one revision
+
+The app uses `DATABASE_URL` from `.env` (same as the running server). **Do not** delete the DB in production; use migrations only.
+
+**Dev-only fallback:** if you don’t care about data and want to resync from scratch, stop the server, delete the SQLite file (e.g. `backend/app.db`), then run `alembic upgrade head` (or restart the server and rely on `create_all` for a brand‑new DB).
 
 ### Interactive API Documentation
 
@@ -594,13 +638,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ## Future Enhancements
 
-- [ ] Database migrations with Alembic
-- [ ] Email notifications for task updates
+- [x] Database migrations with Alembic
+- [x] Email notifications for task updates
+- [x] Real-time updates with WebSockets
 - [ ] Task tags and categories
 - [ ] Subtasks and dependencies
 - [ ] User roles and permissions
 - [ ] Webhook support
-- [ ] Real-time updates with WebSockets
 - [ ] Advanced filtering and search
 - [ ] Task templates
 
